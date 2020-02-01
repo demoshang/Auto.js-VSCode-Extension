@@ -114,6 +114,12 @@ class Extension {
                 devices[0] = recentDevice;
             }
         }
+
+        if (devices.length === 1) {
+            callback(devices[0]);
+            return;
+        }
+
         let names = devices.map(device => device.toString());
         vscode.window.showQuickPick(names)
             .then(select => {
@@ -190,18 +196,50 @@ class Extension {
        this.sendProjectCommand("run_project");
     }
 
-    sendProjectCommand(command: string) {
+    async sendProjectCommand(command: string) {
         let folders = vscode.workspace.workspaceFolders;
+
         if(!folders || folders.length == 0){
             vscode.window.showInformationMessage("请打开一个项目的文件夹");
             return null;
         }
         let folder = folders[0].uri;
-        if(!server.project || server.project.folder != folder){
-            server.project && server.project.dispose();
-            server.project = new Project(folder);
+
+        const uris = await vscode.workspace.findFiles('dist/**/project.json', null, 50);
+
+        let fsPath = '';
+        if (uris.length === 1) {
+            fsPath = uris[0].fsPath;
         }
-        server.sendProjectCommand(folder.fsPath, command);
+        else {
+            let relativePaths = uris.map(uri => uri.fsPath.replace(folder.fsPath, ''));
+            fsPath = await vscode.window.showQuickPick(relativePaths)
+                .then(select => {
+                    const uri = uris.find(({fsPath}) => {
+                      return fsPath === folder.fsPath + select;
+                    });
+
+                    if (uri) {
+                        return uri.fsPath;
+                    }
+                    return ''
+                });
+        }
+
+        if (!fsPath) {
+            fsPath = folder.fsPath;
+        }
+        else {
+            fsPath = fsPath.replace(/\/project\.json$/, '')
+        }
+
+        const projectFolder = vscode.Uri.parse(fsPath);
+        if (!server.project || server.project.folder != folder){
+            server.project && server.project.dispose();
+            server.project = new Project(projectFolder);
+        }
+
+        server.sendProjectCommand(fsPath, command);
     }
     saveProject() {
         this.sendProjectCommand("save_project");
