@@ -176,20 +176,22 @@ export class AutoJsDebugServer extends EventEmitter {
         });
     }
 
-    sendProjectCommand(folder:string, command: string) {
-        this.devices.forEach(device => {
-            if(device.projectObserser == null || device.projectObserser.folder != folder){
-                device.projectObserser = new ProjectObserser(folder, this.fileFilter);
-            }
-            device.projectObserser.diff()
-                .then(result => {
-                    device.sendBytes(result.buffer);
-                    device.sendBytesCommand(command, result.md5, {
-                        'id': folder,
-                        'name': folder
+    async sendProjectCommand(folder:string, command: string) {
+        return Promise.all(
+            this.devices.map(device => {
+                if(device.projectObserser == null || device.projectObserser.folder != folder){
+                    device.projectObserser = new ProjectObserser(folder, this.fileFilter);
+                }
+                return device.projectObserser.diff()
+                    .then(result => {
+                        device.sendBytes(result.buffer);
+                        device.sendBytesCommand(command, result.md5, {
+                            'id': folder,
+                            'name': folder
+                        });
                     });
-                });
-        });
+            })
+        );
     }
 
     sendCommand(command: string, data: object = {}): void {

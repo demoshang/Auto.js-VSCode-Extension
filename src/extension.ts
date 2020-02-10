@@ -197,9 +197,15 @@ class Extension {
     }
 
     async sendProjectCommand(command: string) {
+
+        if (!server.devices.length) {
+            vscode.window.showWarningMessage('手机未连接!!');
+            return;
+        }
+
         let folders = vscode.workspace.workspaceFolders;
 
-        if(!folders || folders.length == 0){
+        if (!folders || folders.length == 0){
             vscode.window.showInformationMessage("请打开一个项目的文件夹");
             return null;
         }
@@ -211,11 +217,11 @@ class Extension {
         if (uris.length === 1) {
             fsPath = uris[0].fsPath;
         }
-        else {
-            let relativePaths = uris.map(uri => uri.fsPath.replace(folder.fsPath, ''));
+        else if (uris.length) {
+            let relativePaths = uris.map(uri => uri.fsPath.replace(folder.fsPath, '')).sort();
             fsPath = await vscode.window.showQuickPick(relativePaths)
                 .then(select => {
-                    const uri = uris.find(({fsPath}) => {
+                    const uri = uris.find(({ fsPath }) => {
                       return fsPath === folder.fsPath + select;
                     });
 
@@ -239,7 +245,8 @@ class Extension {
             server.project = new Project(projectFolder);
         }
 
-        server.sendProjectCommand(fsPath, command);
+        await server.sendProjectCommand(fsPath, command);
+        vscode.window.showInformationMessage("已发送", fsPath.replace(folder.fsPath, ''));
     }
     saveProject() {
         this.sendProjectCommand("save_project");
